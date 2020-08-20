@@ -14,15 +14,23 @@ class AppStateBloc extends Bloc<AppStateEvent,AppState>{
 
   Signaling _signaling = Signaling();
   RTCVideoRenderer _localRenderer= RTCVideoRenderer();
+  RTCVideoRenderer _remoteRenderer= RTCVideoRenderer();
 
   RTCVideoRenderer get localRenderer => _localRenderer;
+  RTCVideoRenderer get remoteRenderer => _remoteRenderer;
 
   _init() async{
     await _localRenderer.initialize();
+    await _remoteRenderer.initialize();
+
     _signaling.init();
     _signaling.onLocalStream=(MediaStream stream){
       _localRenderer.srcObject = stream;
       _localRenderer.mirror = true;
+    };
+    _signaling.onRemoteStream=(MediaStream stream){
+      _remoteRenderer.srcObject = stream;
+      _remoteRenderer.mirror = true;
     };
     _signaling.onConnected=(Map<String,Hero> heroes){
       add(ShowPickerEvent(heroes));
@@ -68,7 +76,7 @@ class AppStateBloc extends Bloc<AppStateEvent,AppState>{
       _signaling.emit('pick', event.heroName);
       yield state.copyWith(status: Status.loading);
     }else if(event is ConnectedEvent){
-      yield state.copyWith(status: Status.connected, me: event.hero, him: null);
+      yield state.copyWith(status: Status.connected, me: event.hero, him: null, mute: false);
     }else if(event is TakenEvent){
       Map<String,Hero> newHeroes= Map();
       newHeroes.addAll(state.heroes);
@@ -93,13 +101,23 @@ class AppStateBloc extends Bloc<AppStateEvent,AppState>{
       }
     }else if(event is CancelRequestEvent){
       _signaling.cancelRequest();
-       yield state.copyWith(status: Status.connected, him: null);
+      yield state.copyWith(status: Status.connected, him: null);
+    }else if(event is FinishCallEvent){
+      _signaling.finishCurrentCall();
+      yield state.copyWith(status: Status.connected, him: null, isFrontCamera: true);
+    }else if(event is SwitchCameraEvent){
+      _signaling.switchCamera();
+       yield state.copyWith(isFrontCamera: event.isFrontCamera);
+    }else if (event is MuteMicrophoneEvent){
+      _signaling.setMicrophoneMuted(event.mute);
+      yield state.copyWith(mute: event.mute);
     }
   }
 
   @override
   Future<void> close() {
     _localRenderer?.dispose();
+    _remoteRenderer?.dispose();
     _signaling.dispose();
     return super.close();
   }

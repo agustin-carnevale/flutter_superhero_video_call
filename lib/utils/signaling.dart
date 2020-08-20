@@ -2,12 +2,14 @@ import 'package:socket_io_client/socket_io_client.dart' as IO;
 import 'package:superhero_app/pages/models/hero.dart';
 import 'package:flutter_webrtc/webrtc.dart';
 import 'package:superhero_app/utils/webrtc_config.dart';
+import 'package:flutter_incall_manager/incall.dart';
 
 typedef OnConnected(Map<String,Hero> heroes);
 typedef OnAssigned(String heroName);
 typedef OnTaken(String heroName);
 typedef OnDisconnected(String heroName);
 typedef OnLocalStream(MediaStream stream);
+typedef OnRemoteStream(MediaStream stream);
 typedef OnResponse(dynamic data);
 typedef OnRequest(dynamic data);
 typedef OnCancelRequest();
@@ -21,6 +23,7 @@ class Signaling {
   OnTaken onTaken;
   OnDisconnected onDisconnected;
   OnLocalStream onLocalStream;
+  OnRemoteStream onRemoteStream;
   OnResponse onResponse;
   OnRequest onRequest;
   OnCancelRequest onCancelRequest;
@@ -31,6 +34,9 @@ class Signaling {
   String _him;
   String _requestId;
   RTCSessionDescription _incomingOffer;
+  IncallManager _incallManager=IncallManager();
+  bool _isFrontCamera=true;
+  bool _muted=false;
 
   Future<void> init() async {
     _localStream =  await navigator.getUserMedia(WebRTCConfig.mediaConstraints);
@@ -62,14 +68,17 @@ class Signaling {
     });
 
     _socket.on('on-request', (data){
+      _incallManager.startRingtone('DEFAULT', 'default', 10);
       _him = data['superHeroName'];
       _requestId= data['requestId'];
+
       final offer = data['offer'];
       _incomingOffer = RTCSessionDescription(offer['sdp'], offer['type']);
       onRequest(data);
     });
     
     _socket.on('on-cancel-request', (data){
+      _incallManager.stopRingtone();
       _finishCall();
       onCancelRequest();
     });
@@ -117,7 +126,8 @@ class Signaling {
       }
     };
     _peer.onAddStream=(MediaStream stream){
-      print("listoos para streaming");
+      onRemoteStream(stream);
+      _incallManager.setForceSpeakerphoneOn(flag: ForceSpeakerType.FORCE_ON);
     };
   }
   
@@ -133,6 +143,7 @@ class Signaling {
   }
 
   acceptOrDecline(bool accept) async{
+    _incallManager.stopRingtone();
     if(accept){
       await _createPeer();
       await _peer.setRemoteDescription(_incomingOffer);
@@ -151,13 +162,34 @@ class Signaling {
     }
   }
 
+  finishCurrentCall(){
+    _socket?.emit('finish-call');
+    _finishCall();
+  }
+
+  switchCamera(){
+    _isFrontCamera = !_isFrontCamera;
+    _localStream?.getVideoTracks()[0]?.switchCamera();
+  }
+
+  setMicrophoneMuted(bool mute){
+    _muted=mute;
+    _localStream?.getAudioTracks()[0]?.setMicrophoneMute(mute);
+  }
+
   cancelRequest(){
     _finishCall();
     _socket.emit('cancel-request');
   }
 
-
   _finishCall(){
+    if(!_isFrontCamera){
+      switchCamera();
+    }
+    if(_muted){
+      setMicrophoneMuted(false);
+    }
+    _incallManager?.stop();
     _him=null;
     _requestId=null;
     _peer?.close();
@@ -165,6 +197,8 @@ class Signaling {
   }
 
   void dispose() {
+    _incallManager?.stop();
+
     _socket?.disconnect();
     _socket.destroy();
     _socket = null;

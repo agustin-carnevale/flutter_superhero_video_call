@@ -18,23 +18,73 @@ class InCalling extends StatelessWidget {
             return Stack(
               alignment: Alignment.center,
               children: [
+                Positioned.fill(
+                  child:Transform.scale(
+                    scale: 2,
+                    alignment: Alignment.center,
+                    child: RTCVideoView(appStateBloc.remoteRenderer))),
                 Positioned(
-                  left: 20,
-                  bottom: 20,
-                  child: Transform.scale(
-                    scale: 0.3,
-                    alignment: Alignment.bottomLeft,
-                    child: ClipRRect(
-                      borderRadius: BorderRadius.circular(10),
-                      child: Container(
-                        width: 480,
-                        height: 640,
-                        color: Color(0xffcccccc),
-                        child: RTCVideoView(appStateBloc.localRenderer),
+                  right: 20,
+                  top: 20,
+                  child: SafeArea(
+                    child: Transform.scale(
+                      scale: 0.3,
+                      alignment: Alignment.topRight,
+                      child: ClipRRect(
+                        borderRadius: BorderRadius.circular(10),
+                        child: Container(
+                          width: 480,
+                          height: 640,
+                          color: Color(0xffcccccc),
+                          child: RTCVideoView(appStateBloc.localRenderer),
+                        ),
                       ),
                     ),
                   ),
                 ),
+                Positioned(
+                  left: 0,
+                  right: 0,
+                  bottom: 10,
+                  child: SafeArea(
+                    child: Row(
+                      mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+                      children: [
+                        FloatingActionButton(
+                          heroTag: 'mic',
+                          backgroundColor: Colors.blueAccent.withOpacity(state.mute ? 0.3 : 1),
+                          child: Icon(
+                            state.mute 
+                            ? Icons.mic_off
+                            : Icons.mic
+                          ),
+                          onPressed: (){
+                            appStateBloc.add(MuteMicrophoneEvent(!state.mute));
+                          }
+                        ),
+                        CupertinoButton(
+                          color: Colors.redAccent,
+                          borderRadius: BorderRadius.circular(30),
+                          padding: const EdgeInsets.symmetric(horizontal: 30, vertical: 10),
+                          child: Icon(Icons.call_end, size: 40,), 
+                          onPressed: (){
+                            appStateBloc.add(FinishCallEvent());
+                          }),
+                        FloatingActionButton(
+                          heroTag: 'cam',
+                          child: Icon(
+                            state.isFrontCamera 
+                            ? Icons.camera_rear
+                            : Icons.camera_front
+                            ),
+                          onPressed: (){
+                            appStateBloc.add(SwitchCameraEvent(!state.isFrontCamera));
+                          }
+                        ), 
+                      ]
+                    ),
+                  )
+                )
               ],
             );
         }

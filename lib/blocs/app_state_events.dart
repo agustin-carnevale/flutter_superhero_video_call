@@ -50,3 +50,15 @@ class AcceptOrDeclineEvent extends AppStateEvent{
 }
 
 class CancelRequestEvent extends AppStateEvent{}
+
+class FinishCallEvent extends AppStateEvent{}
+
+class SwitchCameraEvent extends AppStateEvent{
+  SwitchCameraEvent(this.isFrontCamera): super([isFrontCamera]);
+  final bool isFrontCamera;
+}
+
+class MuteMicrophoneEvent extends AppStateEvent{
+  MuteMicrophoneEvent(this.mute): super([mute]);
+  final bool mute;
+}
